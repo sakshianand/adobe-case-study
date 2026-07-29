@@ -1,6 +1,7 @@
 # Architecture — Marketing Data Ingestion & RAG Assistant
 
 **Deliverable:** Architecture diagram — components, data flows, AI integration points
+
 **Companion documents:** [HIGH_LEVEL_DESIGN.md](HIGH_LEVEL_DESIGN.md) (design rationale and tradeoffs), [README.md](README.md) (how to run it)
 
 ---
@@ -24,6 +25,8 @@ This document answers three questions, in order, each with a diagram and a table
 > Deterministic code computes every fact. AI interprets fuzzy input and phrases facts into English. A human authorises every change to data. No single one of those three ever does another's job.
 
 Every diagram below is annotated to show where that line falls, because the line — not the box diagram — is the actual architecture.
+
+**Figure index.** Twelve diagrams, in order: 1 system context · 2 component architecture · 3–4 ingestion control flow (upload→complete, then review→warehouse) · 5 data transformation · 6 post-approval fan-out · 7 assistant query paths · 8 scheduled ingestion · 9 AI integration points · 10 job lifecycle · 11 security architecture · 12 production evolution.
 
 ---
 
@@ -184,7 +187,9 @@ flowchart TB
 
 ## 4. Data flow — the ingestion path (primary flow)
 
-### 4.1 Control flow
+### 4.1 Control flow, part 1 — upload to `status: complete`
+
+Everything in this first half determines the user's "is my upload done" signal.
 
 ```mermaid
 sequenceDiagram
@@ -233,86 +238,138 @@ sequenceDiagram
     and
         API->>Rec: reconcileSpend(job) → cache on job
     end
+```
 
-    loop client polls ~1s
+### 4.2 Control flow, part 2 — review to warehouse write
+
+The human gate, and the two writes it unlocks.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Approver
+    participant API as Express route layer
+    participant Job as jobStore
+    participant Aud as auditStore
+    participant Ad as Ad Platform (stub)
+    participant DBX as Databricks (stub)
+
+    loop client polls ~1s until status settles
         U->>API: GET /validation/:jobId
         API->>Job: read current state
-        API-->>U: job snapshot
+        API-->>U: job snapshot (status, matches, qualitySummary)
     end
 
-    U->>API: POST /approve { decisions }
+    U->>API: POST /approve { decisions } + session cookie
+    API->>API: requireRole('approver','admin')
     Note over API,Job: actor = req.user.username from the verified session — never a client-supplied field
-    API->>Job: approved=true, decisions, pushStatus=pushing, ingestionStatus=pending
-    par fire-and-forget
-        API->>API: adPlatformPush (accepted decisions only)
-        Note over API,Job: a rejected suggestion → the row keeps its raw name
+    API->>Aud: log approval (actor, jobId, decisions)
+    API->>Job: approved=true, decisions,<br/>pushStatus=pushing, ingestionStatus=pending
+    API-->>U: 200 ack
+
+    par fire-and-forget — neither blocks the other
+        API->>Ad: push accepted rows
+        Note over API,Ad: a rejected suggestion → the row keeps its raw name
+        Ad-->>API: pushStatus = push_success | push_failed
     and
-        API->>API: databricksIngestion — bronze + silver, retry w/ backoff
+        API->>DBX: bronze (raw rows as received)
+        API->>DBX: silver (cleaned + approved names)
+        loop up to 3 attempts, linear backoff
+            DBX-->>API: attempt result
+            API->>Aud: log ingestion attempt
+        end
+        API->>Job: ingestionStatus = ingestion_success | ingestion_failed
+    end
+
+    opt ingestion_failed
+        U->>API: POST /databricks/:jobId/retry
+        Note over API,DBX: one manual attempt, reusing the upload's own idempotency key
     end
 ```
 
-### 4.2 Data transformation flow — what the payload *is* at each hop
+### 4.3 Data transformation flow — what the payload *is* at each hop
 
 ```mermaid
 flowchart TB
     CSV[/"Raw CSV<br/>mixed date formats<br/>inconsistent enums<br/>duplicates, garbage rows"/]
 
-    subgraph Deterministic["Deterministic transformation — no AI"]
-        H["Header check<br/><i>missing column → reject file</i>"]
-        SC["Schema + type + enum<br/><i>unmapped enum → reject row</i>"]
-        DT["Date standardisation<br/><i>unparseable → dateFlag</i>"]
-        BR["Business rules<br/><i>known-bad → correct + record</i>"]
-        DD["Dedupe<br/><i>campaignId + row hash</i>"]
-        QS["Quality score<br/>schema·0.3 + dates·0.2<br/>+ dupes·0.3 + rules·0.2"]
-    end
+    DET["<b>DETERMINISTIC TRANSFORMATION — no AI, streamed one row at a time</b>
+    ─────────────────────────────────────────────
+    <b>1 Header check</b>  missing required column → reject the whole file
+    <b>2 Schema · type · enum</b>  unmapped enum value → reject the row
+    <b>3 Date standardisation</b>  unparseable date → dateFlag, row kept
+    <b>4 Business rules</b>  known-bad value → correct it AND record the correction
+    <b>5 Dedupe</b>  duplicate campaignId or row hash → flag
+    <b>6 Quality score</b>  schema·0.3 + dates·0.2 + dupes·0.3 + rules·0.2"]
 
-    VS[("validationSummary<br/><i>every downstream number<br/>originates here</i>")]
+    VS[("<b>validationSummary</b><br/>totalRows · processed · rejected · needsReview · cleanRows<br/>schemaIssues · dateFlags · duplicates · corrections · qualityScore<br/><i>every downstream number originates here</i>")]
 
-    subgraph AIStage["AI stage — suggests, never applies"]
-        EM["Embed normalized name"]
-        COS["Cosine vs master list"]
-        TH{"confidence<br/>≥ 60%?"}
-    end
+    AIS["<b>AI STAGE — suggests, never applies</b>
+    ─────────────────────────────────────────────
+    embed(normalizeForEmbedding(name)) → 384-dim vector
+    cosine similarity vs ~15 cached master campaign vectors"]
 
-    MATCH[("matches[]<br/>suggest | flag_for_review")]
-    SUM[("qualitySummary<br/><i>prose only — zero new numbers</i>")]
+    TH{"confidence ≥ 60%?<br/><i>threshold lives in code,<br/>not in the model</i>"}
 
-    JOB[("<b>jobStore record</b><br/>status · validationSummary<br/>matches · decisions<br/>pushStatus · ingestionStatus<br/>reconciliation")]
+    MATCH[("<b>matches[]</b><br/>uploadedName · matchedName · confidence · action")]
+    SUM[("<b>qualitySummary</b><br/><i>one sentence — prose only,<br/>zero new numbers</i>")]
 
-    GATE{{"<b>HUMAN APPROVAL GATE</b><br/>per-suggestion accept/reject"}}
+    JOB[("<b>jobStore record</b><br/>status · validationSummary · matches · decisions<br/>pushStatus · ingestionStatus · reconciliation")]
 
-    subgraph Downstream["Post-approval writes"]
-        PUSH["Ad platform push"]
-        BRONZE[("Databricks bronze<br/>raw rows as received")]
-        SILVER[("Databricks silver<br/>cleaned + approved names")]
-        IDX[("Chroma<br/>run summary vector")]
-        RECON[("Reconciliation<br/>variance > 5% → review")]
-        AUD[("Audit log<br/>actor · action · timestamp")]
-    end
-
-    CSV --> H --> SC --> DT --> BR --> DD --> QS --> VS
-    VS --> EM --> COS --> TH
-    TH -->|yes| MATCH
-    TH -->|no| MATCH
-    VS --> SUM
+    CSV --> DET --> VS
+    VS -->|"distinct campaign names"| AIS --> TH
+    TH -->|"yes → action: suggest"| MATCH
+    TH -->|"no → action: flag_for_review"| MATCH
+    VS -->|"exact fact object"| SUM
     MATCH --> SUM
     VS --> JOB
     MATCH --> JOB
     SUM --> JOB
-    JOB --> GATE
-    GATE -->|accepted| PUSH
-    GATE -->|accepted| SILVER
-    GATE -->|"rejected → raw name retained"| SILVER
-    JOB --> BRONZE
-    JOB -.->|fire-and-forget| IDX
-    JOB -.->|fire-and-forget| RECON
-    GATE --> AUD
 
-    style GATE stroke-width:4px
     style VS stroke-width:3px
+    style JOB stroke-width:3px
 ```
 
-### 4.3 Flow inventory
+Two things are true of every number that reaches the Validation Results screen: it was computed inside the grey deterministic block, and it travelled there through `validationSummary`. The AI stage contributes *suggestions* and *prose* to the job record — never a figure.
+
+### 4.4 Post-approval fan-out — what the approval decision unlocks
+
+```mermaid
+flowchart LR
+    JOB[("<b>jobStore record</b><br/>status = complete")]
+
+    GATE{{"<b>HUMAN APPROVAL GATE</b><br/>per-suggestion accept / reject<br/><i>POST /approve — approver | admin</i>"}}
+
+    subgraph Gated["Writes that require approval"]
+        PUSH["Ad platform push<br/><i>accepted rows only</i>"]
+        SILVER[("Databricks <b>silver</b><br/>cleaned rows<br/><i>accepted → matched name<br/>rejected → raw name retained</i>")]
+    end
+
+    subgraph Ungated["Writes that do not — they record, they do not decide"]
+        BRONZE[("Databricks <b>bronze</b><br/>raw rows exactly as received")]
+        AUD[("Audit log<br/>actor · action · timestamp<br/><i>actor from the verified session</i>")]
+    end
+
+    subgraph FF["Fire-and-forget on completion — never gated, never blocking"]
+        IDX[("Chroma<br/>run summary vector")]
+        RECON[("Reconciliation<br/>uploaded vs reported spend<br/><i>variance > 5% → review</i>")]
+    end
+
+    JOB --> GATE
+    GATE --> PUSH
+    GATE --> SILVER
+    GATE --> AUD
+    JOB --> BRONZE
+    JOB -.-> IDX
+    JOB -.-> RECON
+
+    style GATE stroke-width:4px
+    style Gated stroke-width:3px
+```
+
+**Bronze is deliberately not gated.** The raw table records what arrived, which is a fact independent of anyone's judgement; silver records what the organisation decided the data means, which is not. Separating them is what makes a rejected suggestion recoverable — the original name is still sitting in bronze — rather than lost.
+
+### 4.5 Flow inventory
 
 Every data flow in the system, with its transport, timing, and failure behaviour.
 
@@ -563,14 +620,9 @@ Same logical architecture, different physical one. The dashed boxes are what a p
 
 ```mermaid
 flowchart TB
-    subgraph Now["Current — single Node process"]
-        N1["Express API + cron + embeddings<br/>+ in-memory stores, all one process"]
-        N2[("local disk<br/>uploads/")]
-        N3[("single-node Chroma")]
-    end
+    Now["<b>CURRENT</b> — one Node process: Express API + cron + embeddings<br/>+ in-memory stores + local disk <code>uploads/</code> + single-node Chroma"]
 
     subgraph Prod["Production shape"]
-        direction TB
         P0["Browser → <b>pre-signed URL</b> → object storage<br/><i>the file never transits the API tier</i>"]
         P1["<b>API tier</b> — stateless, N instances<br/><i>accepts and reads only</i>"]
         P2[["<b>Queue</b> — SQS / BullMQ / Kafka"]]
