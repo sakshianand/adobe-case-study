@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Color — cool, data-tool palette. Not the AI-cliché warm cream/serif
+     or near-black/neon defaults; grounded in "audit trail you can trust". */
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --border: #E2E5EA;
+  --ink: #14181F;
+  --ink-secondary: #5B6270;
+  --brand: #2A2F6B;
+  --brand-hover: #363C86;
+
+  /* Semantic status — the signature three-state language used identically
+     across every screen: deterministic vs AI-suggested vs excluded. */
+  --verified-bg: #E3F3F1;
+  --verified-fg: #0E7C7B;
+  --review-bg: #FBF0DC;
+  --review-fg: #96650F;
+  --rejected-bg: #FBE9E7;
+  --rejected-fg: #C1443C;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+}
+
+code, .mono { font-family: var(--font-mono); }
+
+button {
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

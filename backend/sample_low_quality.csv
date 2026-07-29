@@ -1,0 +1,7 @@
+Campaign ID,Campaign Name,Platform,Date,Region,Spend,Impressions
+C301,Test Campaign,Google,2026-07-01,NA,1000,10000
+C301,Test Campaign,Google,2026-07-01,NA,1000,10000
+C301,Test Campaign,Google,2026-07-01,NA,1000,10000
+C302,Bad Platform,ShopifyAds,2026-07-01,NA,500,5000
+C303,Bad Region,Google,2026-07-01,MARS,500,5000
+C304,Missing Field,,2026-07-01,NA,500,5000

@@ -1,0 +1,10 @@
+Campaign ID,Campaign Name,Platform,Date,Region,Spend,Impressions
+C001,Summer Sale,GoogleAds,2026-07-01,North America,1200,45000
+C002,Back to School,FB,01/07/2026,EMEA,850,30000
+C003,Holiday Promo,Meta,07-01-2026,N.A.,600,22000
+C004,Summer Sale,Google,2026-07-01,NA,1200,45000
+C005,New Launch,IG,2026-13-01,APAC,400,18000
+C006,Clearance,,2026-07-02,LATAM,300,9000
+C007,Flash Deal,Adobe,2026-07-02,NA,not_a_number,5000
+C008,Odd Platform,ShopifyAds,2026-07-03,NA,700,12000
+C001,Summer Sale,Google,2026-07-01,NA,1200,45000
