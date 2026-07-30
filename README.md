@@ -4,6 +4,14 @@
 
 This project is a prototype for a marketing data ingestion workflow. Users upload CSV files, the backend validates and normalizes the data, AI is used for the fuzzy parts such as campaign-name matching and natural-language Q&A, and the results are surfaced in a review UI.
 
+### Documents
+
+| Document | What it covers |
+|---|---|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | **Case-study deliverable** — components, data flows, and AI integration points.
+| [HIGH_LEVEL_DESIGN.md](HIGH_LEVEL_DESIGN.md) | Design rationale, scalability tradeoffs, security decisions, honest gap map |
+| This README | How the pieces work and why, including the vector-store and matching decisions |
+
 ## Current architecture
 
 - Backend: Node.js + Express
