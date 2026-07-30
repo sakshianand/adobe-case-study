@@ -1,9 +1,3 @@
-
-
-https://github.com/user-attachments/assets/e25d0fca-dc5a-4118-9eee-7a37380fe7f0
-
-
-
 # Adobe Case Study - Marketing Ingestion & RAG Assistant
 
 ## Overview
