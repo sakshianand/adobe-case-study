@@ -4,122 +4,89 @@
 
 This project is a prototype for a marketing data ingestion workflow. Users upload CSV files, the backend validates and normalizes the data, AI is used for the fuzzy parts such as campaign-name matching and natural-language Q&A, and the results are surfaced in a review UI.
 
-### Documents
+---
+
+## Documents
 
 | Document | What it covers |
 |---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | **Case-study deliverable** — components, data flows, and AI integration points.
-| [AI_INTEGRATION.md](AI_INTEGRATION.md) | **Case-study deliverable** — where AI is used, why, and how errors are handled, point by point |
-| [SCALABILITY_RELIABILITY.md](SCALABILITY_RELIABILITY.md) | **Case-study deliverable** — scalability & reliability design: where load concentrates, what's already reliable vs. what's deferred, and why |
-| [TRADEOFFS.md](TRADEOFFS.md) | **Case-study deliverable** — decisions made, alternatives considered, and what I'd do with more time, ranked by priority |
-| [CICD_STRATEGY.md](CICD_STRATEGY.md) | **Case-study deliverable** — CI/CD strategy: pipeline stages, environments, deploy/rollback, and secrets handling, with diagrams |
-| [HIGH_LEVEL_DESIGN.md](HIGH_LEVEL_DESIGN.md) | Design rationale, scalability tradeoffs, security decisions, honest gap map |
-| This README | How the pieces work and why, including the vector-store and matching decisions |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Components, data flows, and AI integration points, with 12 diagrams. Also available as [ARCHITECTURE.docx](ARCHITECTURE.docx); diagrams exported individually to [docs/diagrams/](docs/diagrams) |
+| [AI_INTEGRATION.md](AI_INTEGRATION.md) | Where AI is used, why, and how errors are handled, point by point |
+| [SCALABILITY_RELIABILITY.md](SCALABILITY_RELIABILITY.md) | Scalability & reliability design: where load concentrates, what's already reliable vs. deferred, and why |
+| [TRADEOFFS.md](TRADEOFFS.md) | Decisions made, alternatives considered, and what I'd do with more time, ranked by priority |
+| [CICD_STRATEGY.md](CICD_STRATEGY.md) | CI/CD strategy: pipeline stages, environments, deploy/rollback, and secrets handling, with diagrams |
+| [HIGH_LEVEL_DESIGN.md](HIGH_LEVEL_DESIGN.md) | Design rationale, security decisions, repository map, honest gap map |
 
-## Current architecture
+---
 
-- Backend: Node.js + Express
-- Frontend: React
-- Vector store: Chroma
-- LLM access: Groq
-- Storage for the prototype: temporary file uploads on the server and in-memory job state
+## Demo video
 
-## Streaming CSV processing
+*(To be added.)*
 
-The validation pipeline reads the uploaded CSV as a stream using `fs.createReadStream(...)` and `csv-parse`.
-This keeps memory usage bounded because the app processes one row at a time instead of loading the full file into memory.
+---
 
-## Production-scale tradeoffs
+## How to run it
 
-The current implementation is intentionally simple and practical for a prototype, but it has some important production tradeoffs:
+### Prerequisites
 
-- Local server disk is fine for temporary processing, but it is not ideal for very large files or multi-instance deployments.
-- In-memory job storage is easy to implement, but it is not durable and does not scale across multiple backend instances.
-- A production system should usually use:
-  - object storage such as S3 / Azure Blob / GCS for raw files,
-  - a queue such as BullMQ / SQS / Kafka for async processing,
-  - a persistent database for job state and audit records,
-  - and worker instances that process uploads independently.
+- **Node.js 18+** and npm
+- A **Groq API key** — free at [console.groq.com](https://console.groq.com) — needed for the AI quality summary and the RAG assistant's phrasing
+- **Python 3 + `chromadb`** (`pip install chromadb`), to run a local Chroma server — only required for the RAG assistant's semantic search and run indexing; everything else (upload, validation, campaign matching, approval, dashboard) works without it
 
-## Recommended production pattern
+### 1. Start Chroma (optional, but needed for the full RAG assistant experience)
 
-1. Upload the raw file to object storage.
-2. Enqueue a processing job.
-3. A worker reads the file from storage and validates it in a streaming fashion.
-4. Store only the derived results and metadata in a durable database.
-5. Keep the raw file only as long as needed for processing or compliance.
+```bash
+chroma run --path ./backend/chroma-data
+```
 
-That approach is more scalable, more reliable, and better suited for large files than relying on local server storage alone.
+Leave this running in its own terminal. If you skip this step, uploads, validation, matching, and approval all still work — only semantic RAG queries and run indexing will fail (caught and logged, not fatal — see [AI_INTEGRATION.md](AI_INTEGRATION.md)).
 
-## Why vector databases are used
+### 2. Configure and start the backend
 
-This project uses Chroma as a vector database because the core retrieval feature depends on similarity search, not exact matching.
-Traditional relational databases are excellent for structured records such as job metadata, validation results, and audit logs, but they are not optimized for finding the most semantically similar text or embeddings.
+```bash
+cd backend
+npm install
+cp .env.example .env
+```
 
-Why a vector database is useful here:
-- it stores embeddings generated from ingestion run summaries,
-- it supports fast nearest-neighbor search,
-- and it enables semantic retrieval such as "find runs similar to this failure reason."
+Edit `.env` and set:
+- `GROQ_API_KEY` — your Groq key
+- `JWT_SECRET` — any long random string for local dev (generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`), or leave blank to get a random per-process secret (sessions just reset on restart)
+- `FRONTEND_ORIGIN` — defaults to `http://localhost:5173`, matching the frontend dev server below
 
-Note: campaign-name matching (below) does *not* go through Chroma — it uses a separate, simpler approach. See "How campaign name matching works" for why.
+```bash
+node app.js
+```
 
-Tradeoffs:
-- a vector database adds another system to operate and maintain,
-- it is less convenient than a relational database for standard filtering and joins,
-- and it is usually best used alongside a traditional database rather than replacing it.
+*(`backend/package.json` has no `start` script yet — `node app.js` is the direct equivalent. See [CICD_STRATEGY.md](CICD_STRATEGY.md) §1.1 and §6 for this and the similarly-missing `test` script.)*
 
-In this project, the relational-style data such as jobs, validation summaries, and review decisions still belong in a normal database, while embeddings and similarity search belong in a vector store like Chroma.
+The API listens on `http://localhost:3000` by default (`PORT` env var to override).
 
-Why this decision was made:
-- it keeps the system reproducible,
-- it makes future model upgrades safer,
-- and it avoids silently mixing vectors generated by different embedding pipelines.
+### 3. Start the frontend
 
-Tradeoffs:
-- slightly more bookkeeping than the original prototype,
-- but much better reproducibility and easier migration later,
-- and a cleaner path to versioned collections if the model changes.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-If the embedding model is changed later:
-- existing vectors already stored in Chroma would no longer be directly comparable to vectors produced by the new model,
-- the index would need to be rebuilt or recreated for the new model,
-- and the system should continue to store metadata such as `modelName`, `modelVersion`, `normalizationVersion`, and `embeddingSchemaVersion` alongside each vector or collection.
+Opens at `http://localhost:5173`.
 
-A production-safe approach is to version both the model and the embedding pipeline, and to maintain a separate collection or index for each version until the migration is complete.
+### 4. Log in
 
-## How campaign name matching works
+Three seeded demo accounts, one per role:
 
-Campaign name matching (`backend/services/ai/matching/campaignMatcher.js`) does **not** query Chroma. Instead:
-
-1. The uploaded campaign name is normalized (`normalizeForEmbedding.js`) and embedded with the same embedding client used elsewhere (`embedClient`).
-2. A fixed master list of ~15 known campaign names (`masterCampaignList.js`) is embedded once and cached in memory (`getMasterEmbeddings()`), rather than re-embedded per row.
-3. The uploaded vector is compared against every cached master vector with a plain in-memory cosine similarity loop (`cosineSimilarity.js`) — brute-force, O(n) per lookup, no index.
-4. The best-scoring candidate becomes the suggestion. Above a threshold (60%) it's returned as `action: 'suggest'`; below it, `action: 'flag_for_review'`. It never auto-applies a match — a human always approves.
-
-### Why this approach, not Chroma
-
-- **Master list size.** There are ~15 known campaigns. Brute-force cosine similarity over 15 vectors is effectively instant and trivially correct — there's no meaningful latency or accuracy win from a vector index at this scale.
-- **Static, rarely-changing data.** The master list isn't streamed or updated per request, so there's no ingestion/upsert workload that would justify a database. Caching the embeddings once in memory covers it.
-- **Simplicity and locality of reasoning.** The whole matching decision is readable in one function, with no network hop to an external service and no dependency on Chroma being up. Chroma is reserved for the one thing in this project that actually needs persistence and growing-scale nearest-neighbor search: indexed run summaries for RAG-style Q&A (`indexer.js`).
-- **Separation of concerns.** Mixing "one-off small lookup" and "persistent growing corpus" into the same collection would blur two different lifecycles (a static fixture vs. an ever-growing job history) and complicate versioning of one when the other's embedding model changes.
-
-### Tradeoffs of the current approach
-
-- Doesn't scale past a few hundred–thousand master campaigns — brute-force cosine similarity is O(n) per uploaded name, and with enough rows and enough master campaigns this becomes a real cost.
-- No persistence: the master list and its embeddings live in process memory, so every server restart re-embeds the whole list (cheap here, but wouldn't be if the master list were large or the embedding call were an external API).
-- No incremental updates: adding/removing a master campaign name means editing a source file and redeploying, not writing to a store.
-- Single-process only: the cache isn't shared across multiple backend instances, so each instance re-embeds independently (fine at this size, wasteful at larger scale or with an external embedding API).
-- No metadata filtering: can't cheaply restrict the search to "only this platform's campaigns" or "only active campaigns" the way a proper index with filtering would allow.
-
-### Other options considered
-
-| Approach | Description | When it would make sense |
+| Username | Password | Role |
 |---|---|---|
-| **Current: in-memory brute-force cosine similarity** | Embed once, cache in memory, linear scan per lookup | Small, static reference lists (tens to low hundreds of entries) — what this project has |
-| **Chroma / vector DB for campaign names too** | Store master campaign embeddings in their own Chroma collection, query via nearest-neighbor search | Master list grows large (thousands+), needs persistence across restarts, needs metadata filtering (by platform/region/status), or needs to be updated dynamically without a redeploy |
-| **In-memory ANN index (e.g. HNSW via `hnswlib-node`, `faiss`)** | Same in-process locality as today, but with a proper approximate nearest-neighbor index instead of a linear scan | Master list grows into the thousands and sub-linear lookup matters, but a full external vector DB is still overkill |
-| **Exact/fuzzy string matching (Levenshtein, Jaro-Winkler, trigram similarity)** | No embeddings at all — compare strings directly | Campaign names are expected to differ mostly by typos/formatting rather than by meaning/paraphrase; cheaper and more explainable than embeddings, but misses semantic near-matches |
-| **Hybrid: string match first, embedding fallback** | Try cheap exact/fuzzy match; only call the embedding model if that fails | Want to minimize embedding calls (cost/latency) while still catching semantic matches string similarity would miss |
-| **Database-native vector search (pgvector, Postgres extension)** | Store campaign embeddings as a column in the same relational database as jobs/validation data | Want to avoid operating a second datastore altogether — keep everything in one Postgres instance, at the cost of a less specialized similarity search feature set than a dedicated vector DB |
+| `admin` | `admin123` | admin |
+| `approver` | `approver123` | approver |
+| `uploader` | `uploader123` | uploader |
 
-Given the brief's scope (a small, fixed set of example campaigns), the in-memory approach was chosen as the simplest thing that is still correct and testable. If the master campaign list were expected to grow large, change frequently, or be shared across multiple backend instances, moving it into Chroma (or Postgres + pgvector, to keep it alongside the rest of the relational data) would be the natural next step.
+Log in as `uploader` to upload a CSV, then as `approver` to review and approve AI suggestions, then as `admin` to see scheduling, dashboard, and the audit log.
+
+### Running backend tests
+
+```bash
+cd backend
+node --test test/
+```
