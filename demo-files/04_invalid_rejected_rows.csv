@@ -1,0 +1,14 @@
+Campaign ID,Campaign Name,Platform,Date,Region,Spend,Impressions
+,Missing ID Test,Google,2026-07-20,NA,1000,20000
+C702,,Google,2026-07-20,NA,1000,20000
+C703,Missing Platform Test,,2026-07-20,NA,1000,20000
+C704,Missing Date Test,Google,,NA,1000,20000
+C705,Missing Region Test,Google,2026-07-20,,1000,20000
+C706,Missing Spend Test,Google,2026-07-20,NA,,20000
+C707,Missing Impressions Test,Google,2026-07-20,NA,1000,
+C708,Bad Spend Test,Google,2026-07-20,NA,not_a_number,20000
+C709,Bad Impressions Test,Google,2026-07-20,NA,1000,12000.5
+C710,Unknown Platform Test,TikTok,2026-07-20,NA,1000,20000
+C711,Unknown Region Test,Google,2026-07-20,MARS,1000,20000
+C712,Valid Control Row,Google,2026-07-20,NA,1000,20000
+C713,Valid Control Row Two,Meta,2026-07-21,EMEA,1500,30000

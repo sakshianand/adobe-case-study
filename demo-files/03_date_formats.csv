@@ -1,0 +1,7 @@
+Campaign ID,Campaign Name,Platform,Date,Region,Spend,Impressions
+C601,ISO Format Test,Google,2026-07-15,NA,1000,20000
+C602,DD MM YYYY Test,Google,15/07/2026,NA,1000,20000
+C603,MM DD YYYY Test,Google,07-16-2026,NA,1000,20000
+C604,MM DD YY Test,Google,07/17/26,NA,1000,20000
+C605,Unrecognized Format Test,Google,18-Jul-2026,NA,1000,20000
+C606,Invalid Month Day Test,Google,2026-13-40,NA,1000,20000
