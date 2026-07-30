@@ -10,7 +10,7 @@ This project is a prototype for a marketing data ingestion workflow. Users uploa
 
 | Document | What it covers |
 |---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Components, data flows, and AI integration points, with 12 diagrams. Also available as [ARCHITECTURE.docx](ARCHITECTURE.docx); diagrams exported individually to [docs/diagrams/](docs/diagrams) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Components, data flows, and AI integration points|
 | [AI_INTEGRATION.md](AI_INTEGRATION.md) | Where AI is used, why, and how errors are handled, point by point |
 | [SCALABILITY_RELIABILITY.md](SCALABILITY_RELIABILITY.md) | Scalability & reliability design: where load concentrates, what's already reliable vs. deferred, and why |
 | [TRADEOFFS.md](TRADEOFFS.md) | Decisions made, alternatives considered, and what I'd do with more time, ranked by priority |
