@@ -1,3 +1,7 @@
+
+
+
+
 # Adobe Case Study - Marketing Ingestion & RAG Assistant
 
 ## Overview
@@ -21,9 +25,9 @@ This project is a prototype for a marketing data ingestion workflow. Users uploa
 
 ## Demo video
 
+https://github.com/user-attachments/assets/3b55b166-45b2-44fc-a9ad-0d30d88a7749
 
 
-https://github.com/user-attachments/assets/5122aa64-619c-49e8-9d1e-f3449ba62bef
 
 
 
