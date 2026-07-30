@@ -215,7 +215,7 @@ export default function ReviewPage() {
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>Spend reconciliation summary</p>
-            <Link to={`/reconciliation`} style={{ fontSize: 13, color: 'var(--brand)' }}>View full reconciliation →</Link>
+            <Link to={`/reconciliation?job=${jobId}`} style={{ fontSize: 13, color: 'var(--brand)' }}>View full reconciliation →</Link>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
             <MetricCard label="Matched" value={reconciliation.summary.matched} />

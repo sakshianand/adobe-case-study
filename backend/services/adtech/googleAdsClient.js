@@ -41,10 +41,18 @@ async function fetchReportedSpend({ campaignNames = [], dateRange } = {}) {
     }
   }
   // Platform-only campaigns (spend the platform reports that wasn't in the
-  // requested set at all) still surface, so an unmatched-on-upload-side
-  // discrepancy is visible even if the caller didn't ask about it by name.
-  for (const name of known) {
-    if (!(name in results)) results[name] = CANNED_PLATFORM_SPEND[name];
+  // requested set at all) still surface — but only once the request has
+  // already matched at least one canned campaign, i.e. this upload is
+  // plausibly reconciling against this stubbed ad account in the first
+  // place. Without that gate, every job — even one whose campaigns have
+  // nothing to do with CANNED_PLATFORM_SPEND — picked up the exact same
+  // fixed set of "unmatched platform" rows, making every job's
+  // reconciliation report look identical. A real Ad Tech API would never
+  // return spend for campaigns/accounts you never asked about.
+  if (Object.keys(results).length > 0) {
+    for (const name of known) {
+      if (!(name in results)) results[name] = CANNED_PLATFORM_SPEND[name];
+    }
   }
 
   return { platform: 'Google Ads', dateRange: dateRange || null, spendByCampaign: results };

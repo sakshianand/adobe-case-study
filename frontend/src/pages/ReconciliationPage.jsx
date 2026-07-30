@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useJob } from '../context/JobContext';
 import { getReconciliation } from '../api/client';
 import MetricCard from '../components/MetricCard';
@@ -17,7 +18,13 @@ function money(n) {
 }
 
 export default function ReconciliationPage() {
-  const { jobId } = useJob();
+  const [params] = useSearchParams();
+  // ?job=<id> lets any job be opened directly (e.g. from Pipeline Status
+  // or the Review page's "View full reconciliation" link) — falls back to
+  // JobContext's jobId only when there's no explicit job in the URL, e.g.
+  // navigating here straight from the sidebar right after an upload.
+  const { jobId: activeJobId } = useJob();
+  const jobId = params.get('job') || activeJobId;
   const [thresholdPct, setThresholdPct] = useState(5);
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);

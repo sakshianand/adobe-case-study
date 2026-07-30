@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getPipelineStatus } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
 
@@ -56,6 +57,7 @@ export default function PipelineStatusPage() {
                 <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 500, color: 'var(--ink-secondary)' }}>Status</th>
                 <th style={{ textAlign: 'right', padding: '10px 16px', fontWeight: 500, color: 'var(--ink-secondary)' }}>Quality</th>
                 <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 500, color: 'var(--ink-secondary)' }}>Ad Platform push</th>
+                <th style={{ padding: '10px 16px' }} />
               </tr>
             </thead>
             <tbody>
@@ -78,6 +80,18 @@ export default function PipelineStatusPage() {
                             ? job.pushResult.error
                             : pushMeta.label}
                       />
+                    </td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                      {job.status === 'complete' && (
+                        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                          <Link to={`/review?job=${job.jobId}`} style={{ fontSize: 12, color: 'var(--brand)' }}>
+                            {job.approved ? 'View →' : 'Review →'}
+                          </Link>
+                          <Link to={`/reconciliation?job=${job.jobId}`} style={{ fontSize: 12, color: 'var(--brand)' }}>
+                            Reconciliation →
+                          </Link>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
