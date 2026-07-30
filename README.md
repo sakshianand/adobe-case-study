@@ -9,6 +9,10 @@ This project is a prototype for a marketing data ingestion workflow. Users uploa
 | Document | What it covers |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | **Case-study deliverable** — components, data flows, and AI integration points.
+| [AI_INTEGRATION.md](AI_INTEGRATION.md) | **Case-study deliverable** — where AI is used, why, and how errors are handled, point by point |
+| [SCALABILITY_RELIABILITY.md](SCALABILITY_RELIABILITY.md) | **Case-study deliverable** — scalability & reliability design: where load concentrates, what's already reliable vs. what's deferred, and why |
+| [TRADEOFFS.md](TRADEOFFS.md) | **Case-study deliverable** — decisions made, alternatives considered, and what I'd do with more time, ranked by priority |
+| [CICD_STRATEGY.md](CICD_STRATEGY.md) | **Case-study deliverable** — CI/CD strategy: pipeline stages, environments, deploy/rollback, and secrets handling, with diagrams |
 | [HIGH_LEVEL_DESIGN.md](HIGH_LEVEL_DESIGN.md) | Design rationale, scalability tradeoffs, security decisions, honest gap map |
 | This README | How the pieces work and why, including the vector-store and matching decisions |
 
