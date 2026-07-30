@@ -241,7 +241,7 @@ export default function ReviewPage() {
             />
             %
           </label>
-          <button style={btnStyle} onClick={acceptAboveThreshold}>Accept all above threshold</button>
+          {canApprove && <button style={btnStyle} onClick={acceptAboveThreshold}>Accept all above threshold</button>}
           <button style={btnStyle} onClick={downloadErrorReport}>Download error report</button>
         </div>
       </div>
@@ -255,7 +255,7 @@ export default function ReviewPage() {
             <Row key={key} title="Campaign name match" detail={`${m.uploadedName} → row ${m.row}`}>
               {action ? (
                 <StatusBadge variant={action === 'approved' ? 'verified' : 'rejected'} label={action === 'approved' ? `Approved (${editValue})` : 'Rejected'} />
-              ) : (
+              ) : canApprove ? (
                 <>
                   <StatusBadge variant="review" confidence={m.confidence} />
                   <input
@@ -266,6 +266,10 @@ export default function ReviewPage() {
                   <button style={{ ...btnStyle, marginLeft: 8 }} onClick={() => decide(key, 'approved')}>Approve</button>
                   <button style={btnStyle} onClick={() => decide(key, 'rejected')}>Reject</button>
                 </>
+              ) : (
+                // Read-only for non-approvers: staging a decision they have no way
+                // to push is just confusing UX, not a useful preparatory step.
+                <StatusBadge variant="review" label={`Suggested: ${m.matchedName}`} confidence={m.confidence} />
               )}
             </Row>
           );

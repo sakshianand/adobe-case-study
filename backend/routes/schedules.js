@@ -13,7 +13,9 @@ const { appendAudit } = require('../data/auditStore');
 const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
-router.use(requireRole('admin')); // scoped to this router only — see upload.js's comment on why this can't live at the app.js mount call
+// requireRole is applied per-route below, not via router.use() — see
+// upload.js's comment for why a router-level, no-path .use() leaks into
+// other routers mounted at the same app.js '/' base.
 
 function validateBody({ source, frequency, time, dayOfWeek }) {
   if (!VALID_SOURCES.includes(source)) {
@@ -31,11 +33,11 @@ function validateBody({ source, frequency, time, dayOfWeek }) {
   return null;
 }
 
-router.get('/schedules', (req, res) => {
+router.get('/schedules', requireRole('admin'), (req, res) => {
   res.status(200).json({ schedules: listSchedules() });
 });
 
-router.post('/schedules', (req, res) => {
+router.post('/schedules', requireRole('admin'), (req, res) => {
   const { source, frequency, time, dayOfWeek, timezone, notify } = req.body || {};
   const validationError = validateBody({ source, frequency, time, dayOfWeek });
   if (validationError) {
@@ -48,7 +50,7 @@ router.post('/schedules', (req, res) => {
   res.status(201).json({ schedule });
 });
 
-router.put('/schedules/:id', (req, res) => {
+router.put('/schedules/:id', requireRole('admin'), (req, res) => {
   const existing = getSchedule(req.params.id);
   if (!existing) {
     return res.status(404).json({ error: 'No schedule found with that ID.' });
@@ -77,7 +79,7 @@ router.put('/schedules/:id', (req, res) => {
   res.status(200).json({ schedule });
 });
 
-router.delete('/schedules/:id', (req, res) => {
+router.delete('/schedules/:id', requireRole('admin'), (req, res) => {
   const existing = getSchedule(req.params.id);
   if (!existing) {
     return res.status(404).json({ error: 'No schedule found with that ID.' });
@@ -91,7 +93,7 @@ router.delete('/schedules/:id', (req, res) => {
 // Manual trigger — "Manual" frequency's only way to fire, but also usable
 // for any schedule to run once right now without waiting for its next
 // cron tick (e.g. testing a newly-created schedule).
-router.post('/schedules/:id/trigger', async (req, res) => {
+router.post('/schedules/:id/trigger', requireRole('admin'), async (req, res) => {
   const schedule = getSchedule(req.params.id);
   if (!schedule) {
     return res.status(404).json({ error: 'No schedule found with that ID.' });

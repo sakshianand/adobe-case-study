@@ -6,7 +6,9 @@ const { appendAudit } = require('../data/auditStore');
 const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
-router.use(requireRole('approver', 'admin')); // scoped to this router only — see upload.js's comment on why this can't live at the app.js mount call
+// requireRole is applied directly on the route below, not via router.use()
+// — see upload.js's comment for why a router-level, no-path .use() leaks
+// into other routers mounted at the same app.js '/' base.
 
 // Runs AFTER the response is already sent — same async-job pattern as
 // runJob in routes/upload.js. The reviewer gets an immediate "pushing"
@@ -60,7 +62,7 @@ async function runIngestion(jobId) {
 // per how ReviewPage renders them (see qualitySummary.js's own note that
 // campaign-name matches are the only thing that is ever a suggestion
 // awaiting a human decision).
-router.post('/approve', (req, res) => {
+router.post('/approve', requireRole('approver', 'admin'), (req, res) => {
   const { jobId, decisions } = req.body || {};
   // `actor` comes from the verified session (req.user, set by requireAuth),
   // never from the request body — a client-supplied "reviewer" string

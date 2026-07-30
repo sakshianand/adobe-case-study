@@ -14,12 +14,15 @@ const { requireRole } = require('../middleware/auth');
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
-// Scoped to this router only — every route defined below this line
-// requires uploader or admin. Deliberately not gated at the app.js mount
-// call: `app.use('/', middleware, router)` would run `middleware` for
-// every request reaching that line, not just requests that match a route
-// inside this router, since '/' matches everything as a prefix.
-router.use(requireRole('uploader', 'admin'));
+// requireRole is applied per-route (below), not via router.use(). Every
+// router in this app is mounted at app.js's '/' — a router-level
+// router.use(requireRole(...)) with no path runs for ANY request that
+// reaches this router in the middleware chain, not just requests that
+// match a route defined inside it, since '/' matches everything as a
+// prefix. That let this gate block requests actually meant for routers
+// mounted after this one (e.g. POST /approve), rejecting them with this
+// router's role list instead of ever reaching their own. Attaching the
+// check directly to the one route that needs it avoids that entirely.
 
 function dominantPlatform(platformCounts) {
   const entries = Object.entries(platformCounts);
@@ -71,7 +74,7 @@ async function runJob(jobId, filePath, originalFileName) {
   }
 }
 
-router.post('/upload', upload.single('file'), (req, res) => {
+router.post('/upload', requireRole('uploader', 'admin'), upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file attached. Expected a multipart field named "file".' });
   }
